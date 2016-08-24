@@ -1,3 +1,14 @@
+Book-Characters-Characteristics
+===============================
+
+Book-Characters-Characteristics is a NLP project that extracts traits, states, and feelings of characters from an inputted novel.
+
+It is built upon, forked from and uses as a base the repository BookNLP (https://github.com/dbamman/book-nlp)
+
+More details on how to use this repository and its required files will be added imminently.
+
+Below is the Readme for BookNLP
+
 BookNLP
 =======
 
