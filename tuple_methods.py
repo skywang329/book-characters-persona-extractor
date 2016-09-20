@@ -25,9 +25,15 @@ def is_root(tup):
 def is_person(tup):
 	return char_id(tup) != -1
 
+def is_adjective(tup):
+	return is_pos_of(tup, "JJ")
+
+def is_adverb(tup):
+	return is_pos_of(tup, "RB")	
+	
 def is_parent(tup1, tup2):
 	return parent_index(tup1) == index(tup2)
-
+	
 def has_common_parent(tup1, tup2):
 	return parent_index(tup1) == parent_index(tup2) and tup1 != tup2 
 
