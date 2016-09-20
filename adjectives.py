@@ -63,7 +63,7 @@ def get_nsubj_people(parse_tree, i):
 	return people
 	
 def get_adjectives(parse_tree, i):
-	return [tup for tup in parse_tree[i] if is_pos_of(tup, "JJ")]
+	return [tup for tup in parse_tree[i] if is_adjective(tup)]
 
 def get_nmod_tup(parse_tree, word, a, li, i):
 	return ([tup for tup in parse_tree[i] if 
@@ -201,15 +201,9 @@ def get_punctuations(parse_tree, li, i):
 ##############################################################################
 ##############################################################################
 
-def adj_conds(parse_tree, a, i):
-	return (not is_dependency_of_any(a, ["det", "advcl"])
-			and not (is_dependency_equal(a, "advmod") and
-			not is_pos_of(parent(parse_tree, a, i),"JJ")) and
-			not (is_dependency_of_any(a, ["case", "acl:relcl"])
-			or (is_dependency_of(a, "nsubj") and is_pos_of(a, "JJ"))))
+def has_direct_dependency(parse_tree, a, i):
+	return not is_dependency_of_any(a, ["det", "advcl", "case", "acl:relcl"])
 
-#def g_nibling_conds(parse_tree, p, a, i):
-#	return not 
 
 def check_amod_advmod_conds(parse_tree, a, i):
 	return (is_dependency_equal_any(a, ["amod", "advmod"]) and 
@@ -250,7 +244,7 @@ def get_conj_children(parse_tree, a, i):
 
 def find_RBs(parse_tree, a, i):
 	return	([tup for tup in parse_tree[i] if 
-			 is_pos_of(tup, "RB") and
+			 is_adverb(tup) and
 			 is_parent(tup, a)])
 
 def find_valid_adj_parents(parse_tree, a, i, conjunctions):
@@ -278,7 +272,7 @@ def get_trait_advmods(parse_tree, a, i):
 def get_adj_advcls(parse_tree, a, i):
 	return ([tup for tup in parse_tree[i] if 
 			is_dependency_equal(tup, "advcl") and 
-			is_pos_of(tup, "JJ") and 
+			is_adjective(tup) and 
 			(is_parent(tup, a) or
 			has_common_parent(tup, a)) and 
 			tup != a])
@@ -286,7 +280,7 @@ def get_adj_advcls(parse_tree, a, i):
 def get_adj_acl_relcls(parse_tree, p, i):
 	return ([tup for tup in parse_tree[i] if 
 			is_dependency_equal(tup, "acl:relcl") and 
-			is_pos_of(tup, "JJ") and 
+			is_adjective(tup) and 
 			(is_parent(tup, p) or
 			has_common_parent(tup, p)) and 
 			tup != p])
@@ -389,7 +383,7 @@ def find_negs(parse_tree, a, i):
 										 i),
 							   i))
 
-def path_between_adj_and_parent(parse_tree, a, i):
+def words_between_adj_and_parent(parse_tree, a, i):
 	indices = (range(min(index(a), parent_index(a)),
 				max(index(a), parent_index(a)) + 1))
 	
@@ -399,7 +393,7 @@ def path_between_adj_and_parent(parse_tree, a, i):
 
 def punct_split(parse_tree, li, p, a, i, conjunctions):
 	bigl = []
-	description = []
+	phrase = []
 	last = 0
 	
 	for word in li:
@@ -414,9 +408,9 @@ def punct_split(parse_tree, li, p, a, i, conjunctions):
 		if (a in sublist or 
 			is_next_(parse_tree, p, i, sublist, 0) or 
 			is_first_word_person(sublist, p)):
-			description += sublist
+			phrase += sublist
 	
-	return description
+	return phrase
 
 def is_first_word_person(li, p):
 	if li :
@@ -433,7 +427,7 @@ def is_next_(parse_tree, p, i, sublist, k):
 def sibling_states_conditions(parse_tree, p, a, i):
 	return ((not (is_dependency_of(a, "dep")) and
 			 not (is_dependency_of(a, "nmod") and
-			 	  not is_pos_of(parent(parse_tree, a, i), "JJ")
+			 	  not is_adjective(parent(parse_tree, a, i))
 			 	 )
 			 ) and
 			not ([tup for tup in parse_tree[i]
@@ -492,15 +486,25 @@ def is_related(tup1, tup2):
 	return has_common_parent(tup1, tup2) or is_parent(tup1, tup2)
 
 def nsubj_children(parse_tree, p, a, i):
-	return ([tup for tup in parse_tree[i] if 
-			is_dependency_of(tup, "nsubj") and 
-			(is_parent(tup, a) or 
-			 (is_pos_of(parent(parse_tree, a, i), "VB") and 
-			 	is_related(tup, parent(parse_tree, a, i)))) and
-			char_id(tup) != -1 and 
-			(char_id(tup) != char_id(p) and 
-			 not ((is_dependency_of(tup, "conj") and is_parent(tup, p)) or 
-			 	  (is_dependency_of(p, "conj") and is_parent(p, tup))))])
+	return (
+			[
+			 tup for tup in parse_tree[i] if 
+			 is_dependency_of(tup, "nsubj") and 
+			 (is_parent(tup, a) or 
+			  (
+			   is_pos_of(parent(parse_tree, a, i), "VB") and 
+			   is_related(tup, parent(parse_tree, a, i))
+			  )
+			 ) and
+			 char_id(tup) != -1 and 
+			 (char_id(tup) != char_id(p) and 
+			  not (
+			  	   (is_dependency_of(tup, "conj") and is_parent(tup, p)) or 
+			 	   (is_dependency_of(p, "conj") and is_parent(p, tup))
+			 	  )
+			 )
+			]
+		   )
 
 def nsubj_parents(parse_tree, p, a, i):
 	return ([tup for tup in parse_tree[i] if 
@@ -632,7 +636,7 @@ def add_to_set(char_id, adj_list, container, i):
 
 def check_for_xcomp(parse_tree, adj_list, a, i):
 	if is_dependency_of(a, "xcomp"):
-		adj_list = path_between_adj_and_parent(parse_tree, a, i)
+		adj_list = words_between_adj_and_parent(parse_tree, a, i)
 	
 	return adj_list
 
@@ -697,7 +701,7 @@ def find_valid_person_parents(parse_tree, p, i, conjunctions):
 	else:
 		return []
 
-def get_adj_list(parse_tree, people, p, a, i, stopwords, conjunctions):
+def description(parse_tree, people, p, a, i, stopwords, conjunctions):
 	adj_list = add_dependents(parse_tree, [a], p, a, i, conjunctions)		
 	adj_list = refine(parse_tree, filter_duplicates(adj_list), people, p, a, i, 
 					  stopwords, conjunctions)
@@ -713,7 +717,7 @@ def get_adj_list(parse_tree, people, p, a, i, stopwords, conjunctions):
 ##############################################################################
 ##############################################################################
 
-def print_stuff(parse_tree, word_list, (p, a, i, traits)):
+def print_stuff(parse_tree, word_list, (p, a, i, facts)):
 	print i, '--\n', sentence(word_list, i), '\n', parse_tree[i],\
 	 '----------------------\n'
 	print p
@@ -730,9 +734,39 @@ def print_in_string(dictionary):
 
 	return stringed_dict
 
+def print_all_chars_character_wise(describers, character):
+	facts = describers[0]
+	states = describers[1]
+	feelings = describers[2]
+
+	for id in sorted(character):
+		if id in facts or id in feelings or id in states:
+			print'____________________________________________________________'
+			print id, sorted(character[id])
+			print '----------------'
+			print 'FACTS'
+			print '----------------'
+			if id in facts:
+				for val in facts[id]:
+					print val, get_adj_from_list(facts[id][val])
+			print '----------------'
+			print 'STATES'		
+			print '----------------'
+			if id in states:
+				for val in states[id]:
+					print val, get_adj_from_list(states[id][val])
+			print '----------------'
+			print 'FEELINGS'		
+			print '----------------'
+			if id in feelings:
+				for val in feelings[id]:
+					print val, get_adj_from_list(feelings[id][val])
+			
+			print'____________________________________________________________'
+
 def print_all_chars(describers, character):
 	
-	traits = describers[0]
+	facts = describers[0]
 	states = describers[1]
 	feelings = describers[2]
 
@@ -740,12 +774,12 @@ def print_all_chars(describers, character):
 	print 'FACTS'
 	print'____________________________________________________________'
 
-	for id in traits:
+	for id in facts:
 		print id, sorted(character[id]), '---'
-		for val in traits[id]:
-			print val, get_adj_from_list(traits[id][val])
+		for val in facts[id]:
+			print val, get_adj_from_list(facts[id][val])
 		print '------------------------------------'
-	print len(traits)
+	print len(facts)
 
 	print'____________________________________________________________'
 	print 'STATES'
@@ -924,9 +958,10 @@ def get_char_id(name):
 
 
 def append_quotes(parse_tree):
-	quote_file = open('/home/nikhil/Documents/Project/quote_attributions.txt',
-						'r')
-
+	#quote_file = open('/home/nikhil/Documents/Project/quote_attributions.txt',
+	#					'r')
+	#quote_file = open('mnt/c/Users/Nikhil Prabhu/Documents/Programming/Project/quote_attributions.txt', 'r')
+	quote_file = open('C:/Users/Nikhil Prabhu/Documents/Programming/Project/quote_attributions.txt', 'r')
 	quote_adjs = {}
 	quote_set = []
 	for line in quote_file:
@@ -1008,7 +1043,8 @@ def get_describers(parse_tree, word_list, character, adjs, quote_adjs,
 													 conjunctions, wn,
 													 feels, print_lines)
 			all_describers = merge_describers(describers, opinion_describers)
-			print_all_chars(all_describers, character)
+			#print_all_chars(all_describers, character)
+			print_all_chars_character_wise(all_describers, character)
 
 	elif split_by_chapters:
 		chapter_adjs = chapter_split(adjs, chapter_indices)
@@ -1029,7 +1065,8 @@ def get_describers(parse_tree, word_list, character, adjs, quote_adjs,
 													 conjunctions, wn,
 													 feels, print_lines)
 			all_describers = merge_describers(describers, opinion_describers)
-			print_all_chars(all_describers, character)
+			#print_all_chars(all_describers, character)
+			print_all_chars_character_wise(all_describers, character)
 		
 	else:
 		describers = find_the_adjectives(parse_tree, word_list, adjs,
@@ -1039,22 +1076,23 @@ def get_describers(parse_tree, word_list, character, adjs, quote_adjs,
 		 					  quote_adjs, itertools, stopwords, conjunctions, 
 		 				      wn, feels, print_lines))
 		all_describers = merge_describers(describers, opinion_describers)
-		print_all_chars(all_describers, character)
+		#print_all_chars(all_describers, character)
+		print_all_chars_character_wise(all_describers, character)
 
 	return (describers, opinion_describers, all_describers)
 
-def add_opinions(describers, char_opinion_traits, char_opinion_states,
+def add_opinions(describers, char_opinion_facts, char_opinion_states,
 				 char_val):
-	char_opinion_traits[char_val] = describers[0]
+	char_opinion_facts[char_val] = describers[0]
 	char_opinion_states[char_val] = describers[1]
 	
-def fill_adj_set(parse_tree, people, p, a, i, conj_p_children, dictionary, stopwords, 
+def get_description(parse_tree, people, p, a, i, conj_p_children, dictionary, stopwords, 
 				 conjunctions, print_these):
-	adj_list = get_adj_list(parse_tree, people, p, a, i, stopwords, 
+	adj_list = description(parse_tree, people, p, a, i, stopwords, 
 							conjunctions)
 
 	for child in conj_p_children:
-		adj_list = bigger(adj_list, get_adj_list(parse_tree, people, child, 
+		adj_list = bigger(adj_list, description(parse_tree, people, child, 
 												 a, i, stopwords, 
 												 conjunctions))
 		
@@ -1071,7 +1109,7 @@ def conj_p_children(parse_tree, p, i, people):
 def product(parse_tree, itertools, people, adjectives, i):
 	return ((p, a) for (p,a) in 
 			itertools.product(people, adjectives) if 
-			p and a)
+			p and a and p != a)
 
 def trait_verb_conds(parse_tree, p, i):
 	return (is_pos_equal(parent(parse_tree, p, i), "VBZ") or 
@@ -1080,7 +1118,89 @@ def trait_verb_conds(parse_tree, p, i):
 def trait_det_conds(parse_tree, p, a, i):
 	return (is_parent(p, a) and prev_word_det(parse_tree, a, i))
 
-def map_adjectives(parse_tree, word_list, i, traits, states, feelings, 
+def classify_common_parent_relationship(parse_tree, p, a, i, facts, 
+										states, feelings, wn, feels, conjunctions):
+	if trait_verb_conds(parse_tree, p, i):
+		return facts
+	elif in_sense_set(wn, feels, word(a)):
+		return feelings
+	elif not is_pos_of(parent(parse_tree, a, i), "VB"):
+		if (check_for_in(parse_tree, p, a, i, conjunctions) or 
+			is_root(a)):
+			return states
+		else:
+			return facts
+	elif sibling_states_conditions(parse_tree, p, a, i):
+		return states
+
+def classify_ancestor_relationship(parse_tree, p, a, i, facts, 
+								   states, feelings, wn, feels, 
+								   conjunctions):
+	if (trait_verb_conds(parse_tree, p, i) or
+		trait_det_conds(parse_tree, p, a, i)):
+		return facts
+	elif in_sense_set(wn, feels, word(a)):
+			return feelings
+	elif (ancestor_states_conditions(parse_tree, p, a, i,
+									 conjunctions) or 
+		  is_root(a)):
+		return states
+	else:
+		return facts
+
+def classify_g_nibling_relationship(parse_tree, p, a, i, facts, 
+									states, feelings, wn, feels):
+	if trait_verb_conds(parse_tree, p, i):	
+		return facts
+	elif in_sense_set(wn, feels, word(a)):
+		return feelings
+	elif is_pos_of(parent(parse_tree, p, i), "VB"):
+		return states
+	else:
+		return facts
+
+def parent_relationship(parse_tree, p, a, i):
+	return has_common_parent(p, a) and has_direct_dependency(parse_tree, a, i)
+
+def ancestor_relationship(parse_tree, p, a, i, conjunctions):
+	return (
+			is_ancestor(parse_tree, p, a, i) and 
+		  	not nsubj_children(parse_tree, p, a, i) and 
+		  	(
+		   	 no_punct_in_between(parse_tree, p, a, i, conjunctions) or
+		   	 not has_VB_in_path(parse_tree, p, a, i)
+		  	)
+		   )
+
+def g_nibling_relationship(parse_tree, p, a, i):
+	return (
+			is_g_nibling(parse_tree, p, a, i) and 
+	 		not is_root(parent(parse_tree, p, i)) and 
+		  	has_direct_dependency(parse_tree, a, i) and 
+		  	not nsubj_children(parse_tree, p, a, i)
+		   )
+
+def persona_facet(parse_tree, p, a, i, facts, states, feelings, wn, 
+				  feels, conjunctions):
+	if parent_relationship(parse_tree, p, a, i):
+		return classify_common_parent_relationship(parse_tree, p, a, 
+												   i, facts, states, 
+												   feelings, wn, 
+												   feels, 
+												   conjunctions)
+	elif ancestor_relationship(parse_tree, p, a, i, conjunctions):
+		return classify_ancestor_relationship(parse_tree, p, a, i, 
+											  facts, states, 
+											  feelings, wn, feels, 
+											  conjunctions)
+	elif g_nibling_relationship(parse_tree, p, a, i):
+		return classify_g_nibling_relationship(parse_tree, p, a, i, 
+											   facts, states, 
+											   feelings, wn, feels)
+	else:
+		return {}
+
+def map_adjectives(parse_tree, word_list, i, facts, states, feelings, 
 				   itertools, stopwords, conjunctions, wn, feels, print_these,
 				   adj_set_ids):
 	
@@ -1088,50 +1208,12 @@ def map_adjectives(parse_tree, word_list, i, traits, states, feelings,
 	adjectives = get_adjectives(parse_tree, i)
 
 	for p, a in product(parse_tree, itertools, people, adjectives, i):
-		dictionary = {}
-		
-		if (has_common_parent(p, a) and adj_conds(parse_tree, a, i)):
-			if trait_verb_conds(parse_tree, p, i):
-				dictionary = traits
-			elif in_sense_set(wn, feels, word(a)):
-				dictionary = feelings
-			elif not is_pos_of(parent(parse_tree, a, i), "VB"):
-				if (check_for_in(parse_tree, p, a, i, conjunctions) or 
-					is_root(a)):
-					dictionary = states
-				else:
-					dictionary = traits
-			elif sibling_states_conditions(parse_tree, p, a, i):
-				dictionary = states
-		elif (is_ancestor(parse_tree, p, a, i) and 
-			  not has_VB_in_path(parse_tree, p, a, i)):
-			if (trait_verb_conds(parse_tree, p, i) or
-				trait_det_conds(parse_tree, p, a, i)):
-				dictionary = traits
-			elif in_sense_set(wn, feels, word(a)):
-					dictionary = feelings
-			elif (ancestor_states_conditions(parse_tree, p, a, i,
-											 conjunctions) or 
-				  is_root(a)):
-				dictionary = states
-			else:
-				dictionary = traits
-		elif (is_g_nibling(parse_tree, p, a, i) and 
-			  not is_root(parent(parse_tree, p, i)) and 
-			  adj_conds(parse_tree, a, i) and 
-			  not nsubj_children(parse_tree, p, a, i)):
-				if trait_verb_conds(parse_tree, p, i):	
-					dictionary = traits
-				elif in_sense_set(wn, feels, word(a)):
-					dictionary = feelings
-				elif is_pos_of(parent(parse_tree, p, i), "VB"):
-					dictionary = states
-				else:
-					dictionary = traits
-		
+		dictionary = persona_facet(parse_tree, p, a, i, facts, 
+								   states, feelings, wn, feels, 
+								   conjunctions)
 
-		if (id(dictionary) in adj_set_ids) :
-			fill_adj_set(parse_tree, 
+		if (id(dictionary) in adj_set_ids):
+			get_description(parse_tree, 
 						 people, 
 						 p, a, i, 
 						 conj_p_children(parse_tree, p, i, 
@@ -1144,20 +1226,20 @@ def map_adjectives(parse_tree, word_list, i, traits, states, feelings,
 def find_the_adjectives(parse_tree, word_list, adjs, itertools, stopwords,
 						 conjunctions, wn, feels, print_lines):
 	print_these = []
-	traits = {}
+	facts = {}
 	states = {}
 	feelings = {}
 	
 	for i in sorted(adjs):
-		map_adjectives(parse_tree, word_list, i, traits, states, feelings,
+		map_adjectives(parse_tree, word_list, i, facts, states, feelings,
 		 			   itertools, stopwords, conjunctions, wn, feels, 
-	 				   print_these, adj_set_ids = [id(traits), id(states),
+	 				   print_these, adj_set_ids = [id(facts), id(states),
 	 				   							   id(feelings)])
 	
 	if print_lines:
 		print_all(parse_tree, word_list, print_these)
 	
-	return (traits, states, feelings)
+	return (facts, states, feelings)
 
 def init_adjs(parse_tree, sentence_token):
 	adjs = {}
@@ -1183,14 +1265,14 @@ def write_pickle(pickle, variable, parse_tree, describers, quote_set, adjs, quot
 				 opinion_describers, all_describers):
 	
 	variable['describers'] = describers
-	variable['traits'] = describers[0]
+	variable['facts'] = describers[0]
 	variable['states'] = describers[1]
 	variable['parse_tree'] = parse_tree
 	variable['quote_set'] = quote_set
 	variable['adjs'] = adjs
 	variable['quote_adjs'] = quote_adjs
 	variable['opinion_describers'] = describers
-	variable['opinion_traits'] = opinion_describers[0]
+	variable['opinion_facts'] = opinion_describers[0]
 	variable['opinion_states'] = opinion_describers[1]
 	variable['all_describers'] = all_describers
 	
