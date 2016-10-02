@@ -4,8 +4,13 @@ from dict_methods import *
 import pickle
 import itertools
 import pickle
+import json
 import nltk
+import pprint
+import random
+
 from nltk.corpus import wordnet as wn
+
 
 with open('feelings.pkl', 'rb') as fp:
 		feels = pickle.load(fp)
@@ -18,7 +23,8 @@ for key in  variable.keys():
 
 conjunctions = ["and", "or"]
 stopwords = ["a", "and", "or", "but"]
-forms_of_be = ["is", "was", "were", "be", "would", "will"]
+bes = ["'s", "is", "was", "were", "be", "would", "'ll", "will"]
+haves = ["'d", "had", "have", "has"]
 
 def get_personas():
 	parse_tree = init_parse_tree(sentence_token, norm_tok_list, norm_htok_list,
@@ -31,14 +37,33 @@ def get_personas():
 	subtract(adjs, quote_adjs)
 	#chapter_indices = get_chapters(chapter_names, sentence_token, word_list)
 
-	descs = get_describers(parse_tree, word_list, character, adjs, quote_adjs, 
-						 itertools, stopwords, conjunctions, wn, feels, pov = False,
-						 split_by_chapters = False, print_lines = False)
+	(descriptions, all_phrases) = get_describers(parse_tree, word_list, character, adjs, quote_adjs, 
+						  					   itertools, stopwords, conjunctions, bes, haves, wn, feels, pov = False,
+						  					   split_by_chapters = False, print_lines = False, differentiated = False)
 	
-	return (parse_tree, adjs, quote_set, quote_adjs, descs)
+	return (parse_tree, adjs, quote_set, quote_adjs, descriptions, all_phrases)
 
-(parse_tree, adjs, quote_set, quote_adjs, 
-(describers, opinion_describers, all_describers)) = get_personas()
+def write_json(sample_phrases):
+	with open('descriptions_sample.json', 'w') as outfile:
+		json.dump(sample_phrases, outfile)
 
-write_pickle(pickle, variable, parse_tree, describers, quote_set, adjs, 
-				quote_adjs, opinion_describers, all_describers)
+(parse_tree, adjs, quote_set, quote_adjs, descriptions, all_phrases) = get_personas()
+
+#describers = descriptions[0]
+#opinion_describers = descriptions[1]
+#all_describers = descriptions[2]
+
+#print_personas(descriptions, character, differentiated = False)
+
+print_phrases(all_phrases, pprint)
+
+#print_sample_phrases(all_phrases, pprint, random)
+
+sample_phrases = random.sample(all_phrases, len(all_phrases)/5)
+
+#print_all_chars(all_describers, character)
+
+#write_pickle(pickle, variable, parse_tree, descriptions, quote_set, adjs, 
+#				quote_adjs)
+
+write_json(sample_phrases)
