@@ -10,6 +10,7 @@ import novels.annotators.CharacterFeatureAnnotator;
 import novels.annotators.CoreferenceAnnotator;
 import novels.annotators.PhraseAnnotator;
 import novels.annotators.QuotationAnnotator;
+import novels.annotators.SupersenseAnnotator;
 import novels.annotators.SyntaxAnnotator;
 import novels.util.PrintUtil;
 import novels.util.Util;
@@ -38,7 +39,6 @@ public class BookNLP {
 		File charFile = new File(outputDirectory, outputPrefix + ".book");
 
 		process(book);
-
 
 		CharacterFeatureAnnotator featureAnno = new CharacterFeatureAnnotator();
 		featureAnno.annotatePaths(book);
@@ -69,10 +69,10 @@ public class BookNLP {
 		CoreferenceAnnotator coref = new CoreferenceAnnotator();
 		coref.readWeights(weights);
 		coref.resolvePronouns(book);
+		charFinder.resolveRemainingGender(book);
 
 		System.out.println("Setting Character IDs");
-		SyntaxAnnotator.setCharacterIds(book);	
-
+		SyntaxAnnotator.setCharacterIds(book);
 
 		QuotationAnnotator quoteFinder = new QuotationAnnotator();
 		quoteFinder.findQuotations(book, dicts);
@@ -153,7 +153,10 @@ public class BookNLP {
 			text = Util.filterGutenberg(text);
 			SyntaxAnnotator syntaxAnnotator = new SyntaxAnnotator();
 			tokens = syntaxAnnotator.process(text);
-			System.out.println("Processing text");
+			System.out.println("Processing supersenses");
+			
+			SupersenseAnnotator supersenseAnnotator=new SupersenseAnnotator();
+			supersenseAnnotator.process(tokens);
 		} else {
 			if (tokenFile.exists()) {
 				System.out.println(String.format("%s exists...",
@@ -164,7 +167,6 @@ public class BookNLP {
 		}
 
 		Book book = new Book(tokens);
-		
 		
 		if (cmd.hasOption("w")) {
 			bookNLP.weights = cmd.getOptionValue("w");

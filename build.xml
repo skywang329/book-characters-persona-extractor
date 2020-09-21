@@ -1,22 +1,43 @@
-<project name="narrative" default="all" basedir=".">
+<project name="narrative" default="all" basedir="." xmlns:ivy="antlib:org.apache.ivy.ant">
 
     <import file="common.xml" />
 
     <description>
 	Narrative build file
     </description>
-    <target name="init">
+
+    <available classname="org.apache.ivy.Main" property="ivy.installed"/>
+	<target name="install-ivy" description="Install ivy" unless="ivy.installed">
+	    <mkdir dir="${user.home}/.ant/lib"/>
+	    <get dest="${user.home}/.ant/lib/ivy.jar" src="http://search.maven.org/remotecontent?filepath=org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar"/>
+	    <fail message="Ivy has been installed. Run the build again"/>
+	</target>
+
+	<ivy:settings file="ivysettings.xml"/>
+
+    <target name="init" depends="install-ivy">
 	<!-- Create the time stamp -->
 	<tstamp/>
 	<!-- Create the build directory structure used by compile -->
 		<mkdir dir="${build}"/>
 	</target>
 
+	<target name="resolve" depends="init" description="Use ivy to resolve classpaths">
+	    <ivy:cachepath pathid="compile.path">
+	    	<dependency org="javax.xml.bind" name="jaxb-api" rev="2.3.1"/>
+	    	<dependency org="com.sun.xml.bind" name="jaxb-core" rev="2.3.0"/>
+	    	<dependency org="com.sun.xml.bind" name="jaxb-impl" rev="2.3.0"/>
+	    	<dependency org="javax.activation" name="activation" rev="1.1.1"/>
+	    </ivy:cachepath>
+	</target>
+
     <target name="all" depends="jar"/>
 
-    <target name="compile" depends="init" description="compile the source">
+	<target name="compile" depends="resolve" description="compile the source">
 	<!-- Compile the java code from ${src} into ${build} -->
-	<javac srcdir="${src}" destdir="${build}" debug="on" source="1.5" target="1.5" deprecation="on" excludes="**/*.xml">
+	<javac srcdir="${src}" destdir="${build}" debug="on" source="1.10" target="1.10" deprecation="on" excludes="**/*.xml">
+		<compilerarg line="--add-modules java.xml.bind"/>
+
 	    <classpath>
 		<fileset dir="lib">
 		    <include name="**/*.jar" />
@@ -25,7 +46,7 @@
 
 	</javac>
 
-    </target>
+	</target>
 
     <target name="jar" depends="compile" description="generate the book-nlp JAR" >
 	<!-- Create the distribution directory -->

@@ -1,3 +1,8 @@
+Updated Contents
+===============================
+
+Updated to work with the newest changes from the original Book NLP.
+
 Book-Characters-Characteristics
 ===============================
 
@@ -20,6 +25,7 @@ BookNLP is a natural language processing pipeline that scales to books and other
 * Character name clustering (e.g., "Tom", "Tom Sawyer", "Mr. Sawyer", "Thomas Sawyer" -> TOM_SAWYER)
 * Quotation speaker identification
 * Pronominal coreference resolution
+* Supersense tagging (e.g., "animal", "artifact", "body", "cognition", etc.)
 
 This pipeline is described in the following paper; please cite if you write a research paper using this software:
 
@@ -86,7 +92,7 @@ The main output here is data/tokens/dickens.oliver.tokens, which contains the or
 11. Penn Treebank POS tag
 12. NER tag (PERSON, NUMBER, DATE, DURATION, MISC, TIME, LOCATION, ORDINAL, MONEY, ORGANIZATION, SET, O)
 13. Stanford basic dependency label
-14. Within-quotation flag
+14. Quotation label (begin quote, inside quote, outside quote)
 15. Character id (all coreferent tokens share the same character id)
 
 The data/output/dickens folder will now contain:

@@ -262,8 +262,6 @@ public class PrintUtil {
 					guessString = token.word;										
 					characterId = token.characterId;
 				}
-
-				
 				
 				out.write(String.format("%s\t%s\t%s\t%d\t%s\t%s\t%s\t%d\n", book.id,
 						quote.start, quote.end, quote.sentenceId, 0, quote.attributionId,

@@ -25,32 +25,8 @@ import java.util.*;
  */
 public class QuotationAnnotator {
 
-	public void setQuotes(Book book) {
-		boolean inQuote=false;
-		int lastPar=-1;
-		int lastStart=-1;
-		for (int i=0; i<book.tokens.size(); i++) {
-			Token token=book.tokens.get(i);
-			if (token.p != lastPar) {
-				inQuote=false;
-			}
-			token.quotation=inQuote;
-			if (token.word.equals("''") || token.word.equals("``")) {
-				if (inQuote) {
-					Token start=book.tokens.get(lastStart);
-					start.lemma="``";
-				} else {
-					lastStart=i;
-				}
-				inQuote = !inQuote;
-			}
-			lastPar=token.p;
-			
-		}
-	}
 	public void findQuotations(Book book, Dictionaries dicts) {
 
-		setQuotes(book);
 		// Add "I" as possible speaker
 		for (Token token : book.tokens) {
 			if (token.pos.startsWith("PRP") && (token.lemma.equals("I"))) {
@@ -67,24 +43,99 @@ public class QuotationAnnotator {
 
 		quotations = Maps.newTreeMap();
 
-		// find all quotations (delimited by `` '')
+		int doubleQuotes = 0;
+		int singleQuotes = 0;
 		for (Token token : book.tokens) {
 			if (token.lemma.equals("``")) {
-				start = token.tokenId;
-			} else if (token.lemma.equals("''")) {
-				end = token.tokenId;
-
-				if (start > -1) {
-					Quotation quote = new Quotation(start, end,
-							token.sentenceID);
-					quote.p = token.p;
-					quotations.put(start, quote);
-				}
-				start = -1;
-
+				doubleQuotes++;
+			} else if (token.lemma.equals("`")) {
+				singleQuotes++;
 			}
 		}
 
+		boolean usesSingleQuotes = false;
+		if (singleQuotes > doubleQuotes) {
+			usesSingleQuotes = true;
+		}
+
+		boolean open = false;
+
+		if (usesSingleQuotes) {
+
+			Token previousToken = null;
+
+			// fixes a problem with single quotes before "I" not being recognized as open quotes
+			for (int i = 0; i < book.tokens.size(); i++) {
+				Token token = book.tokens.get(i);
+				if (token.original.equals("'")) {
+					if (!previousToken.whitespaceAfter.equals("")) {
+						token.lemma="`";
+						token.word="`";
+						token.pos="``";
+					}
+				}
+				previousToken=token;
+			}
+
+
+			previousToken = null;
+
+			for (int i = 0; i < book.tokens.size(); i++) {
+				Token token = book.tokens.get(i);
+				if (token.lemma.equals("`")) {
+
+					if (!previousToken.whitespaceAfter.equals("")) {
+						open = true;
+						start = token.tokenId;
+					}
+				} else if (token.lemma.equals("'")) {
+					end = token.tokenId;
+
+					if (start > -1 && open) {
+						Quotation quote = new Quotation(start, end,
+								token.sentenceID);
+						quote.p = token.p; // **
+						quotations.put(start, quote);
+					}
+					start = -1;
+
+					open = false;
+
+				}
+				previousToken = token;
+
+			}
+		} else {
+			for (Token token : book.tokens) {
+				if (token.lemma.equals("``")) {
+					open = true;
+					start = token.tokenId;
+				} else if (token.lemma.equals("''")) {
+					end = token.tokenId;
+
+					if (start > -1 && open) {
+						Quotation quote = new Quotation(start, end,
+								token.sentenceID);
+						quote.p = token.p; // **
+						quotations.put(start, quote);
+					}
+					start = -1;
+
+					open = false;
+				}
+			}
+		}
+
+		for (Token token : book.tokens) {
+			token.quotation = "O";
+		}
+		for (int qstart : quotations.keySet()) {
+			Quotation quotation = quotations.get(qstart);
+			book.tokens.get(quotation.start).quotation = "B-QUOTE";
+			for (int s = quotation.start+1; s <= quotation.end; s++) {
+				book.tokens.get(s).quotation = "I-QUOTE";
+			}
+		}
 
 		// // combine quotations than span multiple sentences
 		// HashSet<Integer> rem = Sets.newHashSet();
@@ -143,7 +194,7 @@ public class QuotationAnnotator {
 				if (quoteSentence != currentSentence)
 					break;
 				if (book.animateEntities.containsKey(i)
-						&& token.quotation == false
+						&& token.quotation.equals("O")
 						&& !token.pos.equals("PRP$")) {
 					quote.attributionId = i;
 					//System.out.println("1 " + quote.sentenceId + " " + quote.attributionId);
@@ -175,7 +226,7 @@ public class QuotationAnnotator {
 				if (quoteSentence != currentSentence)
 					break;
 				if (book.animateEntities.containsKey(i)
-						&& token.quotation == false
+						&& token.quotation.equals("O")
 						&& !token.pos.equals("PRP$")) {
 					quote.attributionId = i;
 					//System.out.println("2 " + quote.sentenceId + " " + quote.attributionId);
@@ -208,7 +259,7 @@ public class QuotationAnnotator {
 					if (token.p != p)
 						break;
 					if (book.animateEntities.containsKey(i)
-							&& token.quotation == false
+							&& token.quotation.equals("O")
 							&& !token.pos.equals("PRP$")) {
 						quote.attributionId = i;
 						//System.out.println("3 " + quote.sentenceId + " " + quote.attributionId);
@@ -241,7 +292,7 @@ public class QuotationAnnotator {
 					if (token.p != p)
 						break;
 					if (book.animateEntities.containsKey(i)
-							&& token.quotation == false
+							&& token.quotation.equals("O")
 							&& !token.pos.equals("PRP$")) {
 						quote.attributionId = i;
 						//System.out.println("4 " + quote.sentenceId + " " + quote.attributionId);

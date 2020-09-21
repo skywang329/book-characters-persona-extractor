@@ -3,7 +3,7 @@ package novels;
 public class Token {
 	public int sentenceID;
 	public int tokenId;
-	public boolean quotation;
+	public String quotation;
 	public int p;
 	public String word;
 	public String original;
@@ -18,6 +18,7 @@ public class Token {
 	public String whitespaceAfter;
 	public int characterId=-1;
 	public int coref;
+	public String supersense;
 
 	public boolean isPersonOrOrg() {
 		return ner.equals("PERSON") || ner.equals("ORGANIZATION");
@@ -45,9 +46,12 @@ public class Token {
 		this.pos = parts[10];
 		this.ner = parts[11];
 		this.deprel = parts[12];
-		this.quotation = Boolean.valueOf(parts[13]);
+		this.quotation = parts[13];
 		if (parts.length > 14) {
 			this.characterId = Integer.valueOf(parts[14]);
+		}
+		if (parts.length > 15) {
+			this.supersense = parts[15];
 		}
 	}
 
@@ -66,9 +70,12 @@ public class Token {
 		this.pos = parts[10];
 		this.ner = parts[11];
 		this.deprel = parts[12];
-		this.quotation = Boolean.valueOf(parts[13]);
+		this.quotation = parts[13];
 		if (parts.length > 14) {
 			this.characterId = Integer.valueOf(parts[14]);
+		}
+		if (parts.length > 15) {
+			this.supersense = parts[15];
 		}
 
 	}
@@ -86,17 +93,17 @@ public class Token {
 	}
 
 	public static String ORDER = String.format(
-			"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+			"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
 			"paragraphId", "sentenceID", "tokenId", "beginOffset", "endOffset",
 			"whitespaceAfter", "headTokenId", "originalWord", "normalizedWord",
-			"lemma", "pos", "ner", "deprel", "inQuotation", "characterId");
+			"lemma", "pos", "ner", "deprel", "inQuotation", "characterId", "supersense");
 
 	public String toString() {
 		return String.format(
-				"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+				"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
 				p, sentenceID, tokenId, beginOffset, endOffset,
 				whitespaceAfter, head, original, word, lemma, pos, ner, deprel,
-				quotation, characterId);
+				quotation, characterId, supersense);
 
 	}
 

@@ -37,7 +37,7 @@ import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
-import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedCCProcessedDependenciesAnnotation;
+import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.BasicDependenciesAnnotation;
 import edu.stanford.nlp.ling.IndexedWord;
 import edu.stanford.nlp.trees.GrammaticalRelation;
 
@@ -175,9 +175,9 @@ public class SyntaxAnnotator {
 
 	public static ArrayList<Token> readDocs(List<String> infiles) {
 		ArrayList<Token> tokens = new ArrayList<Token>();
-		int parOffset=0;
-		int sentenceOffset=0;
-		int tokenOffset=0;
+		int parOffset = 0;
+		int sentenceOffset = 0;
+		int tokenOffset = 0;
 		try {
 
 			for (String infile : infiles) {
@@ -186,16 +186,15 @@ public class SyntaxAnnotator {
 				String str1;
 
 				while ((str1 = in1.readLine()) != null) {
-					Token token = new Token(str1.trim(), parOffset, sentenceOffset, tokenOffset);
+					Token token = new Token(str1.trim(), parOffset,
+							sentenceOffset, tokenOffset);
 					tokens.add(token);
-					
 				}
-				Token lastToken=tokens.get(tokens.size()-1);
-				parOffset=lastToken.p+1;
-				sentenceOffset=lastToken.sentenceID+1;
-				tokenOffset=lastToken.tokenId+1;
+				Token lastToken = tokens.get(tokens.size() - 1);
+				parOffset = lastToken.p + 1;
+				sentenceOffset = lastToken.sentenceID + 1;
+				tokenOffset = lastToken.tokenId + 1;
 			}
-
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -215,31 +214,35 @@ public class SyntaxAnnotator {
 
 			}
 
+			in1.close();
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return tokens;
 	}
 
+	// This is largely unneeded, https://universaldependencies.org/docs/en/overview/migration-guidelines.html
+	// "onsidering the new treatment of prepositional phrases the basic representation already has direct dependencies
+	// between content words which makes the collapsed representation largely obsolete. On the other hand, the propagation of
+	// conjunt dependencies still adds useful dependencies in UD.""
 	public static HashSet<Integer> getRecursiveDeps(int index, Book book) {
+		// Modified by: Sky
 		HashSet<Integer> deps = new HashSet<Integer>();
-		HashSet<Integer> seen = new HashSet<Integer>();
-		if (book.dependents.containsKey(index)) {
-			TreeSet<Integer> nextDeps = book.dependents.get(index);
-			for (int i : nextDeps) {
-				//if (i != index){
-					//seen.add(i);
-					deps.addAll(getRecursiveDeps(i, book));
-				//}
-				//for (Integer d : getRecursiveDeps(i, book)){
-				//	if (!deps.contains(d))
-				//		deps.add(d);
-				//}			
-			}
+		TreeSet<Integer> deps_treeset = book.dependents.get(index);
+		for (int i : deps_treeset) {
+			deps.add(i);
 		}
-
-		deps.add(index);
 		return deps;
+		// HashSet<Integer> deps = new HashSet<Integer>();
+		// if (book.dependents.containsKey(index)) {
+		// 	TreeSet<Integer> nextDeps = book.dependents.get(index);
+		// 	for (int i : nextDeps) {
+		// 			deps.addAll(getRecursiveDeps(i, book));			
+		// 	}
+		// }
+		// deps.add(index);
+		// return deps;
 	}
 
 	public static void setDependents(Book book) {
@@ -285,13 +288,42 @@ public class SyntaxAnnotator {
 						"-c %s -m parse -w %s -lfi parser.log", MALT, MALT_DIR));
 			}
 		} catch (MaltChainedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 
-	public ArrayList<Token> process(String doc)
-			throws Exception {
+	public ArrayList<Token> process(String doc) throws Exception {
+
+		// ADDED BY SKY:
+		Properties props_no_ssplit = new Properties();
+		props_no_ssplit.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, depparse");
+		props_no_ssplit.setProperty("ssplit.isOneSentence", "true");
+		StanfordCoreNLP pipeline_no_ssplit = new StanfordCoreNLP(props_no_ssplit);
+		// ***
+
+		/*
+		 * First see if newlines separate paragraphs or if they show up in the
+		 * middle of lines.
+		 */
+		String[] sents = doc.split("\n");
+		float punctCount = 0;
+		float nonPuntCount = 0;
+		boolean newlineParagraphs = false;
+		for (String sent : sents) {
+			if (sent.length() > 0) {
+				String last = sent.substring(sent.length() - 1);
+				if (last.equals(".") || last.equals("\"") || last.equals(":")
+						|| last.equals("?") || last.equals("!")) {
+					punctCount++;
+				} else {
+					nonPuntCount++;
+				}
+			}
+		}
+
+		if (punctCount / (punctCount + nonPuntCount) > .5) {
+			newlineParagraphs = true;
+		}
 
 		if (service == null || count % 10 == 0) {
 			initialize();
@@ -308,8 +340,6 @@ public class SyntaxAnnotator {
 		int s = 0;
 		int t = 0;
 		int p = 0;
-
-		boolean quotation = false;
 		
 		System.out.println("Tokenizing Sentences...");
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
@@ -317,21 +347,20 @@ public class SyntaxAnnotator {
 		int totalSentences = sentences.size() - 1;
 		System.out.println("Sentences tokenized.");
 
-		for (CoreMap sentence : sentences) {
+		ArrayList<ArrayList<Token>> sentenceannos = new ArrayList<ArrayList<Token>>();
+		
+		for (int cm_indx = 0; cm_indx < sentences.size(); cm_indx++) {
+			CoreMap sentence = sentences.get(cm_indx);
+
 			if (s % 100 == 0 || s == totalSentences) {
 				double ratio = ((double) s) / totalSentences;
 				System.err.print(String.format(
 						"\t%.3f (%s out of %s) processed\r", ratio, s,
 						totalSentences));
 			}
-			int oldId, newId;
-			int id = 1;
-			String[] parseTokens = new String[sentence.get(
-					TokensAnnotation.class).size()];
 
 			ArrayList<Token> annos = new ArrayList<Token>();
 			
-			oldId = id;
 			for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
 
 				String word = token.get(TextAnnotation.class);
@@ -343,10 +372,6 @@ public class SyntaxAnnotator {
 				String whitespaceAfter = token.after();
 				String original = token.originalText();
 
-				if (word.equals("``")) {
-					quotation = true;
-				}
-
 				Token anno = new Token();
 				anno.original = original;
 				anno.word = word;
@@ -357,30 +382,111 @@ public class SyntaxAnnotator {
 				anno.tokenId = t;
 				anno.beginOffset = beginOffset;
 				anno.endOffset = endOffset;
-				anno.quotation = quotation;
+				anno.quotation = "O";
 				anno.setWhitespaceAfter(whitespaceAfter);
 				anno.p = p;
 				annos.add(anno);
-				String parseToken = String.format("%d\t%s\t%s\t%s\t%s\t%s", id,
-						word, lemma, pos, pos, "_");
-				parseTokens[id - 1] = parseToken;
-				id++;
 				allWords.add(anno);
 				t++;
 				whitespaceAfter = anno.whitespaceAfter;
 
-				if (word.equals("''")) {
-					quotation = false;
-				}
-
-				if (token.after().matches("\\n{2,}")) {
+				if (token.after().matches("\\n{2,}")
+						|| (token.after().matches("\\n") && newlineParagraphs)) {
 					p++;
 				}
+			}
+
+			sentenceannos.add(annos);
+		}
+
+		// fix sentence mistakes (like: "Yes!" he said).
+		ArrayList<ArrayList<Token>> new_sentences = new ArrayList<ArrayList<Token>>();
+		// Added by: Sky
+		ArrayList<CoreMap> sentences_fixed = new ArrayList<CoreMap>();
+
+		boolean lastFlag = false;
+
+		for (int s_idx = 0; s_idx < sentenceannos.size(); s_idx++) {
+
+			boolean lowercaseFlag = false;
+
+			ArrayList<Token> annos = sentenceannos.get(s_idx);
+			if (annos.size() > 0
+					&& annos.get(0).word.toLowerCase()
+							.equals(annos.get(0).word)
+					&& annos.get(0).word.matches(".*[a-z].*")) {
+				lowercaseFlag = true;
+			}
+
+			// I think what this is doing is just combining sentences together, if an error was detected.
+			if (lastFlag == true && lowercaseFlag == true) {
+				// Error detected, initialize this_annos as previous sentence (it's not done)
+				ArrayList<Token> this_annos = new_sentences.get(new_sentences
+						.size() - 1);
+				// Join current sentence with previous sentence.
+				for (int t_idx = 0; t_idx < annos.size(); t_idx++) {
+					Token anno = annos.get(t_idx);
+					this_annos.add(anno);
+				}
+				new_sentences.set(new_sentences.size() - 1, this_annos);
+				// ***
+				String sentence_fixed = sentences_fixed.get(sentences_fixed.size()-1).toString();
+				sentence_fixed = sentence_fixed + " " + sentences.get(s_idx).toString();
+				Annotation sent_annotate = new Annotation(sentence_fixed);
+				pipeline_no_ssplit.annotate(sent_annotate);
+				CoreMap sentence_fixed_coremap = sent_annotate.get(SentencesAnnotation.class).get(0);
+
+				// System.out.println(sent_annotate.get(SentencesAnnotation.class));
+
+				sentences_fixed.set(sentences_fixed.size()-1, sentence_fixed_coremap);
+
+			} else {
+				// No error detected.
+				ArrayList<Token> newannos = new ArrayList<Token>();
+				// Just put the current sentence into newannos.
+				for (int t_idx = 0; t_idx < annos.size(); t_idx++) {
+					Token anno = annos.get(t_idx);
+					newannos.add(anno);
+				}
+				new_sentences.add(newannos);
+				// ***
+				sentences_fixed.add(sentences.get(s_idx));
+			}
+
+			lastFlag=false;
+			if (annos.size() > 1) {
+				Token ultimate = annos.get(annos.size() - 1);
+				Token penultimate = annos.get(annos.size() - 2);
+				if (ultimate.word.equals("''")
+						&& (penultimate.word.equals("?") || penultimate.word
+								.equals("!"))) {
+					lastFlag = true;
+				}
+			}
+		}
+
+		// System.out.println("new_sentences:" + new_sentences.size() + ", sentences: " + sentences_fixed.size());
+
+		for (int s_idx = 0; s_idx < new_sentences.size(); s_idx++) {
+			
+			ArrayList<Token> annos = new_sentences.get(s_idx);
+			CoreMap sentence = sentences_fixed.get(s_idx);
+
+			int oldId, newId;
+			int id = 1;
+			oldId = id;
+			String[] parseTokens = new String[annos.size()];
+			for (Token anno : annos) {
+				String parseToken = String.format("%d\t%s\t%s\t%s\t%s\t%s", id,
+						anno.word, anno.lemma, anno.pos, anno.pos, "_");
+				parseTokens[id - 1] = parseToken;
+				id++;
+				anno.sentenceID = s;
 			}
 			s++; // 
 			newId = id;		
 ///*
-			SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
+			SemanticGraph dependencies = sentence.get(BasicDependenciesAnnotation.class);
 			
 			//String dep_type = "CollapsedDependenciesAnnotation";
 			//System.out.println(dep_type+" ===>>");
@@ -535,14 +641,14 @@ public class SyntaxAnnotator {
 
 	public static int getEndpoint(int i, Book book) {
 		Token token = book.tokens.get(i);
-		int corefHead=-1;
+		int corefHead = -1;
 		int head = token.coref;
 
 		if (token.coref != 0) {
 			corefHead = token.coref;
-			int hops=0;
+			int hops = 0;
 			if (corefHead != 0) {
-				head=corefHead;
+				head = corefHead;
 			}
 			while (corefHead != 0) {
 				hops++;
@@ -556,7 +662,7 @@ public class SyntaxAnnotator {
 				}
 				corefHead = tokenHead.coref;
 				if (corefHead != 0) {
-					head=corefHead;
+					head = corefHead;
 				}
 			}
 				

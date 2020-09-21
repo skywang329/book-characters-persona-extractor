@@ -187,6 +187,7 @@ public class CoreferenceAnnotator {
 				if (token.coref != 0) {
 					int corefHead = token.coref;
 					int hops=0;
+					// go backwards from pronoun until a known character is reached
 					while (corefHead != 0) {
 						hops++;
 						if (hops > 100) {
@@ -263,6 +264,10 @@ public class CoreferenceAnnotator {
 		int last = token.tokenId - 1;
 		int l = last;
 		int count = 0;
+
+		if (l < 0) {
+			return candidates;
+		}
 
 		// find starting point (antecedentWindow only pertains to tokens of the
 		// same quotation level)
